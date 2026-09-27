@@ -8,14 +8,15 @@ to disk. It never clicks, moves the mouse, or interacts with anything.
 
 ## Features
 
-- A side panel (toolbar icon) with Start tracking / Stop tracking / Open folder buttons
+- A side panel (toolbar icon) with Start tracking / Stop tracking buttons; the current
+  status text shows exactly which file and folder are being written to
 - Tracking is off by default when the plugin loads - nothing gets written until you
   click Start
 - Skips the login xp-sync burst so your first row is a real drop, not your entire
   account's stored xp
 - One CSV row per genuine xp increase: `timestamp,skill,xp_gained,total_xp,level`
-- Files are written to `.runelite/xp-drop-logger/`, RuneLite's own convention for
-  plugin-written data
+- Files are written to this plugin's sandboxed data directory
+  (`.runelite/plugin-data/xp-drop-logger/`)
 
 ## Configuration
 

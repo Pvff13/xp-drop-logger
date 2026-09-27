@@ -2,10 +2,9 @@ package com.xpdroplogger;
 
 import com.google.inject.Provides;
 import java.awt.image.BufferedImage;
-import java.io.File;
-import java.io.FileWriter;
 import java.io.IOException;
 import java.io.Writer;
+import java.nio.file.StandardOpenOption;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
@@ -20,20 +19,20 @@ import net.runelite.api.Skill;
 import net.runelite.api.events.GameStateChanged;
 import net.runelite.api.events.GameTick;
 import net.runelite.api.events.StatChanged;
-import net.runelite.client.RuneLite;
 import net.runelite.client.config.ConfigManager;
 import net.runelite.client.eventbus.Subscribe;
 import net.runelite.client.plugins.Plugin;
 import net.runelite.client.plugins.PluginDescriptor;
 import net.runelite.client.ui.ClientToolbar;
 import net.runelite.client.ui.NavigationButton;
+import net.runelite.client.util.Filepath;
 import net.runelite.client.util.ImageUtil;
 
 /**
- * Logs every real xp drop (per-skill xp increase) to a CSV file under
- * .runelite/xp-drop-logger/. Purely observational - reads client state and writes to
- * disk, never clicks or interacts with anything. Tracking is off by default; start/stop
- * it from the side panel.
+ * Logs every real xp drop (per-skill xp increase) to a CSV file under this plugin's
+ * sandboxed data directory (.runelite/plugin-data/xp-drop-logger/). Purely observational
+ * - reads client state and writes to disk, never clicks or interacts with anything.
+ * Tracking is off by default; start/stop it from the side panel.
  */
 @Slf4j
 @PluginDescriptor(
@@ -43,7 +42,6 @@ import net.runelite.client.util.ImageUtil;
 )
 public class XpDropLoggerPlugin extends Plugin
 {
-	static final File DATA_DIR = new File(RuneLite.RUNELITE_DIR, "xp-drop-logger");
 	private static final DateTimeFormatter ROW_TIMESTAMP = DateTimeFormatter.ISO_INSTANT;
 	private static final DateTimeFormatter FILE_TIMESTAMP = DateTimeFormatter.ofPattern("yyyy-MM-dd_HH-mm-ss");
 
@@ -78,7 +76,8 @@ public class XpDropLoggerPlugin extends Plugin
 
 	private boolean tracking;
 
-	private File sessionFile;
+	private Filepath dataDir;
+	private Filepath sessionFile;
 
 	@Provides
 	XpDropLoggerConfig provideConfig(ConfigManager configManager)
@@ -87,7 +86,7 @@ public class XpDropLoggerPlugin extends Plugin
 	}
 
 	@Override
-	protected void startUp()
+	protected void startUp() throws IOException
 	{
 		lastXp.clear();
 		initializeTicks = 2;
@@ -95,7 +94,10 @@ public class XpDropLoggerPlugin extends Plugin
 		tracking = false;
 		sessionFile = null;
 
-		ensureDataDirExists();
+		// Plugin.getPluginDirectory() is the sandboxed replacement for manually building
+		// a path under RuneLite.RUNELITE_DIR - resolves to .runelite/plugin-data/xp-drop-logger.
+		dataDir = getPluginDirectory();
+		dataDir.createDirectories();
 
 		panel = new XpDropLoggerPanel(this);
 		BufferedImage icon = ImageUtil.loadImageResource(XpDropLoggerPlugin.class, "panel_icon.png");
@@ -124,7 +126,7 @@ public class XpDropLoggerPlugin extends Plugin
 			// fields, which a bare Instant doesn't carry - it must be attached to a zone
 			// first (system default here, since this is only used for a local filename).
 			String timestamp = FILE_TIMESTAMP.format(Instant.now().atZone(ZoneId.systemDefault()));
-			sessionFile = new File(DATA_DIR, "xp-drops_" + timestamp + ".csv");
+			sessionFile = dataDir.join("xp-drops_" + timestamp + ".csv");
 		}
 
 		tracking = true;
@@ -152,12 +154,12 @@ public class XpDropLoggerPlugin extends Plugin
 
 	String getCurrentFileName()
 	{
-		return resolveTargetFile().getName();
+		return resolveTargetFile().getFileName();
 	}
 
-	void ensureDataDirExists()
+	String getDataDirPath()
 	{
-		DATA_DIR.mkdirs();
+		return dataDir.toString();
 	}
 
 	@Subscribe
@@ -249,19 +251,19 @@ public class XpDropLoggerPlugin extends Plugin
 
 		int level = event.getLevel();
 		Instant now = Instant.now();
-		File targetFile = resolveTargetFile();
+		Filepath targetFile = resolveTargetFile();
 
 		executor.submit(() -> writeRow(targetFile, now, skill, xpGained, currentXp, level));
 	}
 
-	private File resolveTargetFile()
+	private Filepath resolveTargetFile()
 	{
 		if (config.newFilePerSession() && sessionFile != null)
 		{
 			return sessionFile;
 		}
 
-		return new File(DATA_DIR, "xp-drops.csv");
+		return dataDir.join("xp-drops.csv");
 	}
 
 	/**
@@ -270,23 +272,13 @@ public class XpDropLoggerPlugin extends Plugin
 	 * writer open across the session, at the cost of a bit of per-row overhead that's
 	 * irrelevant off the client thread.
 	 */
-	private void writeRow(File file, Instant timestamp, Skill skill, int xpGained, int totalXp, int level)
+	private void writeRow(Filepath file, Instant timestamp, Skill skill, int xpGained, int totalXp, int level)
 	{
 		try
 		{
 			boolean isNewFile = !file.exists();
 
-			if (isNewFile)
-			{
-				File parent = file.getParentFile();
-				if (parent != null && !parent.exists() && !parent.mkdirs())
-				{
-					log.warn("Unable to create directory {}", parent);
-					return;
-				}
-			}
-
-			try (Writer writer = new FileWriter(file, true))
+			try (Writer writer = file.openWriter(StandardOpenOption.CREATE, StandardOpenOption.APPEND))
 			{
 				if (isNewFile)
 				{

@@ -11,16 +11,14 @@ import javax.swing.border.EmptyBorder;
 import net.runelite.client.ui.ColorScheme;
 import net.runelite.client.ui.PluginPanel;
 import net.runelite.client.ui.components.PluginErrorPanel;
-import net.runelite.client.util.LinkBrowser;
 
-/** Side panel: start/stop tracking, and a shortcut to open the folder xp-drops.csv is written to. */
+/** Side panel: start/stop tracking. */
 class XpDropLoggerPanel extends PluginPanel
 {
 	private final XpDropLoggerPlugin plugin;
 
 	private final JButton startButton = new JButton("Start tracking");
 	private final JButton stopButton = new JButton("Stop tracking");
-	private final JButton openFolderButton = new JButton("Open folder");
 
 	private final PluginErrorPanel statusPanel = new PluginErrorPanel();
 
@@ -52,25 +50,14 @@ class XpDropLoggerPanel extends PluginPanel
 		c.gridy = 0;
 		buttonPanel.add(stopButton, c);
 
-		c.gridx = 0;
-		c.gridy = 1;
-		c.gridwidth = 2;
-		buttonPanel.add(openFolderButton, c);
-
 		layoutPanel.add(buttonPanel);
 		layoutPanel.add(statusPanel);
 
 		startButton.setFocusable(false);
 		stopButton.setFocusable(false);
-		openFolderButton.setFocusable(false);
 
 		startButton.addActionListener(e -> plugin.startTracking());
 		stopButton.addActionListener(e -> plugin.stopTracking());
-		openFolderButton.addActionListener(e ->
-		{
-			plugin.ensureDataDirExists();
-			LinkBrowser.open(XpDropLoggerPlugin.DATA_DIR.toString());
-		});
 
 		updateStatus();
 	}
@@ -84,11 +71,13 @@ class XpDropLoggerPanel extends PluginPanel
 
 		if (tracking)
 		{
-			statusPanel.setContent("Tracking", "Xp drops are being logged to " + plugin.getCurrentFileName() + ".");
+			statusPanel.setContent("Tracking", "Xp drops are being logged to " + plugin.getCurrentFileName()
+				+ " in " + plugin.getDataDirPath() + ".");
 		}
 		else
 		{
-			statusPanel.setContent("Not tracking", "Click Start tracking to begin logging xp drops.");
+			statusPanel.setContent("Not tracking", "Click Start tracking to begin. Files are written to "
+				+ plugin.getDataDirPath() + ".");
 		}
 	}
 }
