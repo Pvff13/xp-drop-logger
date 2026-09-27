@@ -38,7 +38,13 @@ import net.runelite.client.util.ImageUtil;
 @PluginDescriptor(
 	name = "XP Drop Logger",
 	description = "Logs every xp drop to a CSV file for external analysis",
-	tags = {"xp", "experience", "tracker", "log", "export", "csv"}
+	tags = {"xp", "experience", "tracker", "log", "export", "csv"},
+	// Required by Plugin.getPluginDirectory() (used in startUp() below) - must match
+	// this plugin's manifest filename in the plugin-hub repository exactly
+	// (plugins/xp-drop-logger). Omitting this throws IllegalArgumentException at
+	// startUp() with no indication in the plugin list of why - confirmed the hard way
+	// via a real hub install failing silently for exactly this reason.
+	internalName = "xp-drop-logger"
 )
 public class XpDropLoggerPlugin extends Plugin
 {
